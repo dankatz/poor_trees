@@ -53,27 +53,73 @@ evals <- c("AustinTX2022Curr", "BaltimoreMD2022Curr", "BurlingtonVT2022Curr",  "
            "SanAntonioTX2022Curr", "SanDiegoCA2022Curr", "SpringfielMO2020Curr", "StLouisMO2022Curr",    
            "TrentonNJ2022Curr", "WashingtonDC2022Curr" )
 
-### adding the Urban FIA data from datamart #####################################
-# this version of UFIA was downloaded Nov 2024
-psca <- read.csv(file.path("data","FIADB_URBAN_ENTIRE_CSV/ID_PLOT_STRAT_CALC_ASSGN.csv"))
-psc <- read.csv(file.path("data","FIADB_URBAN_ENTIRE_CSV/POP_STRATUM_CALC.csv"))
-plt <- read.csv(file.path("data","FIADB_URBAN_ENTIRE_CSV/ID_PLOT.csv")) #summary(plt)
-ref_plot_status <- read.csv(file.path("data","FIADB_URBAN_ENTIRE_CSV/REF_PLOT_STATUS.csv"))
-mtre <- read.csv(file.path("data","FIADB_URBAN_ENTIRE_CSV/ID_MOTHER_TREE.csv"))
-indiv_tree <- read.csv(file.path("data","FIADB_URBAN_ENTIRE_CSV/ID_TREE.csv"))
-subp <- read.csv(file.path("data","FIADB_URBAN_ENTIRE_CSV/ID_SUBPLOT.csv"))
-cnd <- read.csv(file.path("data","FIADB_URBAN_ENTIRE_CSV/ID_COND.csv"))
-spcnd <- read.csv(file.path("data","FIADB_URBAN_ENTIRE_CSV/ID_SUBP_COND.csv"))
-ref_species <- read.csv(file.path("data","FIADB_URBAN_ENTIRE_CSV/REF_SPECIES.csv"))
-ref_species_group <- read.csv(file.path("data","FIADB_URBAN_ENTIRE_CSV/REF_SPECIES_GROUP.csv"))
-plt$PLOT_STATUS_CD_LAB <- ref_plot_status$ABBR[match(plt$PLOT_STATUS_CD, ref_plot_status$VALUE)]
+### adding the Urban FIA data from datamart and creating derived variables #####################################
+    # this version of UFIA was downloaded Nov 2024
+    psca <- read.csv(file.path("data","FIADB_URBAN_ENTIRE_CSV/ID_PLOT_STRAT_CALC_ASSGN.csv"))
+    psc <- read.csv(file.path("data","FIADB_URBAN_ENTIRE_CSV/POP_STRATUM_CALC.csv"))
+    plt <- read.csv(file.path("data","FIADB_URBAN_ENTIRE_CSV/ID_PLOT.csv")) #summary(plt)
+    ref_plot_status <- read.csv(file.path("data","FIADB_URBAN_ENTIRE_CSV/REF_PLOT_STATUS.csv"))
+    mtre <- read.csv(file.path("data","FIADB_URBAN_ENTIRE_CSV/ID_MOTHER_TREE.csv"))
+    indiv_tree <- read.csv(file.path("data","FIADB_URBAN_ENTIRE_CSV/ID_TREE.csv"))
+    subp <- read.csv(file.path("data","FIADB_URBAN_ENTIRE_CSV/ID_SUBPLOT.csv"))
+    cnd <- read.csv(file.path("data","FIADB_URBAN_ENTIRE_CSV/ID_COND.csv"))
+    spcnd <- read.csv(file.path("data","FIADB_URBAN_ENTIRE_CSV/ID_SUBP_COND.csv"))
+    ref_species <- read.csv(file.path("data","FIADB_URBAN_ENTIRE_CSV/REF_SPECIES.csv"))
+    ref_species_group <- read.csv(file.path("data","FIADB_URBAN_ENTIRE_CSV/REF_SPECIES_GROUP.csv"))
+    plt$PLOT_STATUS_CD_LAB <- ref_plot_status$ABBR[match(plt$PLOT_STATUS_CD, ref_plot_status$VALUE)]
+    
+  ## summarizing tree data at the plot level 
+   #creating a damage category from the ID_TREE file for adding to mtre before summarizing
+      indiv_tree_damage <- indiv_tree %>% 
+        mutate(damaged = case_when(DMG_ROOT_STEM_GIRDLING == 1 ~ 1,
+                                   DMG_TRUNK_BARK_INCLUSION == 1 ~ 1,
+                                   DMG_EXCESS_MULCH == 1 ~ 1,
+                                   DMG_TOPPING_PRUNING == 1 ~ 1,
+                                   DMG_SIDEWALK_ROOT_CONFLICT == 1 ~ 1,
+                                   DMG_OVERHEAD_WIRES == 1 ~ 1,
+                                   DMG_IMPROPER_PLANTING== 1 ~ 1, 
+                                   .default = 0)) %>% 
+        group_by(PLOTID, TREE) %>% 
+        dplyr:: summarise(damaged = max(damaged, na.rm = TRUE))
 
+  ## summarizing mtre tree data at the plot level 
+    plot_tree_summary <- 
+      left_join(mtre, indiv_tree_damage) %>% #adding in the tree damage from the indiv_tree (ID_TREE) dataset
+      group_by(PLT_CN) %>% 
+      filter(SUBP == 1) %>%  #restricting to non-sapling trees (DBH > 5 in)
+      filter(STATUSCD == 1 | STATUSCD == 2) %>% #removing trees that weren't measured due to no longer being in the sample
+      #STATUSCD 0 == tree is not in the remeasured plot, STATUSCD 3 == cut and utilized, STATUSCD 4 == removed
+      mutate(trees_alive = case_when(STATUSCD == 2 ~ 0, #STATUSCD 1 == live tree, STATUSCD 2 == dead tree
+                                     STATUSCD == 1 ~ 1),
+             trees_planted = case_when(IS_PLANTED == 1 ~ 1, #1 == planted
+                                       IS_PLANTED == 2 ~ 0, #2 == natural origin
+                                       IS_PLANTED == 3 ~ 0)) %>% #3 == "not sure"; we are lumping unsure with natural origin
+      dplyr::summarize(plot_BA = sum(BASAL_AREA, na.rm = TRUE),
+                       # The 'TPA_UNADJ' column value (trees per acre) 
+                       # might be convenient as the units are sq ft per acre 
+                       plot_n_trees = n(),
+                       plot_prop_alive = mean(trees_alive, na.rm = TRUE),
+                       plot_mean_dieback = mean(CROWN_DIEBACK_CD, na.rm = TRUE),
+                       plot_prop_damaged = mean(damaged, na.rm = TRUE),
+                       plot_mean_no_foliage = mean(FOLIAGE_ABSENT, na.rm = TRUE),
+                       plot_crown_diam = mean(CROWN_DIA_90, na.rm = TRUE),
+                       plot_street_tree = mean(IS_STREET_TREE, na.rm = TRUE),
+                       plot_planted = mean(trees_planted, na.rm = TRUE),
+                       plot_leaf_area = sum(LEAF_AREA_ITREE, na.rm = TRUE),
+                       plot_mean_LAI_raw = mean(LEAF_AREA_INDEX_ITREE, na.rm = TRUE), #this is an average of LAI for all trees at a plot,
+                          #it is not the average LAI of canopy within the plot though
+                       plot_mean_LAI = weighted.mean(x = LEAF_AREA_INDEX_ITREE, w = CROWN_GROUND_AREA_ITREE, na.rm = TRUE), #this is 
+                          #a mean of LAI at the plot weighted by tree canopy area
+                       plot_compensatory_value = mean(COMPENSATORY_VALUE_ITREE, na.rm = TRUE),
+                       plot_spp_richness = n_distinct(SPCD))
+    
+    
 
-
-
+    
 ### start the city loop for extracting US Census (ACS) data for each UFIA plot ##############
 pcv_out <- list() 
 for(i in c(1:length(evals))){   # to run all cities. 
+    #for(i in c(1:2)){   #
   
   ### For each city prepare UFIA data ======================================================
   
@@ -118,7 +164,8 @@ for(i in c(1:length(evals))){   # to run all cities.
   # bring in state code for census API
   sf_plots$state <- plt$STATECD[match(sf_plots$PLT_CN, plt$CN)]
   
-  ### get  relevant census data and calculate summary for each buffered plot =======================
+  
+  ### get  relevant US census data and calculate summary for each buffered plot =======================
   ## download census data for the relevant state
   bg_data <- get_acs(geography = "block group", 
                      variables = c(
@@ -190,9 +237,10 @@ for(i in c(1:length(evals))){   # to run all cities.
              people_per_area = as.numeric(c_total_popE /bg_area_original))
     bg_data_clipped <- st_intersection(bg_data_city, sf_plots_1km) #takes ~10 sec to run
     
-    #removing any block groups that no one lives in (poverty and race/income are irrelevant there)
+    #removing any block groups that no one lives in (poverty and race/income are irrelevant there) 
     bg_data_clipped <- bg_data_clipped %>%  
-                        filter(c_total_popE > 0)  #plot(bg_data_clipped[1])
+                        filter(c_total_popE > 0) %>%  #plot(bg_data_clipped[1])
+                        filter(c_poverty_1E > 0) 
       
     bg_data_clipped_c <- bg_data_clipped %>% 
          filter(st_is_valid(.) == TRUE) #remove any potential errors in geometry
@@ -200,17 +248,40 @@ for(i in c(1:length(evals))){   # to run all cities.
      print(paste("removed this many block groups with bad geometry:", nrow(bg_data_clipped) - nrow(bg_data_clipped_c), 
                  "out of a total of", nrow(bg_data_clipped)))
     
+     #is census data missing for any areas?
+       print(paste("number of NA values in poverty estimate:", sum(is.na(bg_data_clipped_c$estimate_c_perc_poverty))))
+       print(paste("number of NA values in whiteness estimate:", sum(is.na(bg_data_clipped_c$estimate_c_perc_white))))
+             
+     
   ##calculate demographic response variable weighted means within 1 km of each plot
-   bg_ready <- bg_data_clipped_c %>% 
+   bg_focal_city <- bg_data_clipped_c %>% 
         mutate(area_subset_m2 = st_area(geometry), #calculating the area of the polygon subset
                people_in_subset = people_per_area * as.numeric(area_subset_m2)) %>% #calculate the people within that polygon subset
         st_drop_geometry()   %>% 
         dplyr::group_by(PLT_CN, CN, EVALID) %>% 
-        dplyr::summarize( estimate_c_perc_poverty = weighted.mean(x = estimate_c_perc_poverty, w = people_in_subset),
-                   estimate_c_perc_white = weighted.mean(x = estimate_c_perc_white, w = people_in_subset))
+        dplyr::summarize( estimate_c_perc_poverty = round(weighted.mean(x = estimate_c_perc_poverty, w = people_in_subset), 3),
+                          estimate_c_perc_white = round(weighted.mean(x = estimate_c_perc_white, w = people_in_subset), 3),
+                          people_per_ha = weighted.mean(x = people_per_area, w = people_in_subset)*10000) %>% 
+        mutate(city = city_choose) %>% 
+        ungroup()
   
    
+   ## export results from city loop
+   if(i == 1){bg_out <- bg_focal_city}else{bg_out <- bind_rows(bg_out, bg_focal_city)}
+   
+   print(paste("finished with city:", city_choose))
+} #end city loop for census data
+
+    sum(is.na(bg_out))
+    
+### combine UFIA and US Census data and export for analysis #######################################################  
+    # bg_out 
+    # plot_tree_summary
+    ufia_acs <- left_join(plot_tree_summary, bg_out) 
+
   
-           
-           
-           
+    ### save the file used in the analysis 
+    csv_out_path <- file.path(here::here(),"out")
+    formatted_date <- format(Sys.Date(), "%y%m%d") # Gives "02-01-2025"
+
+    write_csv(x = ufia_acs, file = file.path(csv_out_path, paste0("ufia_acs_for_analysis_", formatted_date, ".csv")))
