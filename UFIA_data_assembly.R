@@ -33,17 +33,7 @@ options(scipen=999)
 options(tigris_use_cache = TRUE)
 
 
-# categorizing cities by location in the country
-NE_cities <- c("BaltimoreMD2022Curr", "BurlingtonVT2022Curr",  "ChicagoIL2022Curr", "ClevelandOH2022Curr", 
-               "DesMoinesIA2022Curr",
-               "MadisonWI2022Curr",  "MilwaukeeWI2022Curr",  "MinneapolMN2022Curr",
-               "PittsburghPA2022Curr", "PortlandME2022Curr", 
-               "ProvidenceRI2022Curr", "RochesterNY2022Curr", "TrentonNJ2022Curr", "WashingtonDC2022Curr" )
-SW_cities <- c("AustinTX", "HoustonTX", "SanAntonioTX" )
 
-NE_cities_not_eval <- c("BaltimoreMD", "BurlingtonVT",  "ChicagoIL", "ClevelandOH",   "DesMoinesIA",  
-                        "MadisonWI",  "MilwaukeeWI",  "MinneapolMN","PittsburghPA", "PortlandME", 
-                        "ProvidenceRI", "RochesterNY", "TrentonNJ", "WashingtonDC" )
 
 #including additional cities that were available on 11/23/2024
 evals <- c("AustinTX2022Curr", "BaltimoreMD2022Curr", "BurlingtonVT2022Curr",  "ChicagoIL2022Curr",
@@ -119,7 +109,7 @@ evals <- c("AustinTX2022Curr", "BaltimoreMD2022Curr", "BurlingtonVT2022Curr",  "
 ### start the city loop for extracting US Census (ACS) data for each UFIA plot ##############
 pcv_out <- list() 
 for(i in c(1:length(evals))){   # to run all cities. 
-    #for(i in c(1:2)){   #
+    #for(i in c(8:22)){   #
   
   ### For each city prepare UFIA data ======================================================
   
@@ -223,7 +213,7 @@ for(i in c(1:length(evals))){   # to run all cities.
     # this catches an error with Houston 2021
     if(just_the_place$NAME =="Howe town, Texas"){
       just_the_place <- places[places$NAME=="Houston city, Texas" ,]
-      city_block_groups <- bg[just_the_place, ]
+      city_block_groups <- bg_data[just_the_place, ]
     }
   
   
@@ -262,10 +252,9 @@ for(i in c(1:length(evals))){   # to run all cities.
         dplyr::summarize( estimate_c_perc_poverty = round(weighted.mean(x = estimate_c_perc_poverty, w = people_in_subset), 3),
                           estimate_c_perc_white = round(weighted.mean(x = estimate_c_perc_white, w = people_in_subset), 3),
                           people_per_ha = weighted.mean(x = people_per_area, w = people_in_subset)*10000) %>% 
-        mutate(city = city_choose) %>% 
+        mutate(city = parsed_city_name) %>% 
         ungroup()
   
-   
    ## export results from city loop
    if(i == 1){bg_out <- bg_focal_city}else{bg_out <- bind_rows(bg_out, bg_focal_city)}
    
@@ -275,13 +264,42 @@ for(i in c(1:length(evals))){   # to run all cities.
     sum(is.na(bg_out))
     
 ### combine UFIA and US Census data and export for analysis #######################################################  
-    # bg_out 
+
     # plot_tree_summary
     ufia_acs <- left_join(plot_tree_summary, bg_out) 
 
-  
+    #adding plot coordinates back in
+    Plot_coords <- plt %>% 
+      select(CN, LAT, LON, PLOT_STATUS_CD_LAB) 
+    ufia_acs <- left_join(ufia_acs, Plot_coords, by = c("PLT_CN" = "CN")) #unique(ufia_acs2$LAT)
+    
+    
     ### save the file used in the analysis 
     csv_out_path <- file.path(here::here(),"out")
     formatted_date <- format(Sys.Date(), "%y%m%d") # Gives "02-01-2025"
 
     write_csv(x = ufia_acs, file = file.path(csv_out_path, paste0("ufia_acs_for_analysis_", formatted_date, ".csv")))
+
+### additional QA/QC ##############################################################################################
+    
+# are plots without information those that we wouldn't expect to have any info?
+# after spot checking, it seems that the missing points are those that are well outside of the city itself
+    #This restriction to just the city is justified by not wanting to include the complexities of urban-rural gradients
+    #Some cities do have a small amount of missing census data within their bounds, however, this is minor and 
+        #appears to be due to areas without people living within 1 km (e.g., large parks, harbors, etc.,)
+    
+    #test <- 
+   ufia_acs %>% 
+      filter(LON > -77 & LON < -76 & LAT> 39 & LAT <39.5) %>% #Baltimore
+      #filter(LON > -98 & LON < -97 & LAT> 30 & LAT <31) %>%  #Austin
+      #filter(LON > -82 & LON < -81 & LAT> 41 & LAT < 42) %>% #Cleveland
+      #filter(LON > -74 & LON < -73 & LAT> 44 & LAT < 45) %>% #Burlington
+      #filter(LON > -71 & LON < -70 & LAT> 43 & LAT < 44) %>% #Portland, ME
+      #filter(city == "Portland, ME") %>% 
+      #mutate(estimate_c_perc_poverty_nas = replace_na(estimate_c_perc_poverty, -99)) %>% 
+      mutate(census_NA_values = case_when(is.na(estimate_c_perc_poverty) ~ "no census",
+                                          !is.na(estimate_c_perc_poverty) ~ "census")) %>% 
+      ggplot(aes(x= LON, y = LAT, color = census_NA_values)) + geom_point() + theme_bw() 
+    
+    
+    
