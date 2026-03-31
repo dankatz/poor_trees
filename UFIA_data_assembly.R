@@ -31,17 +31,27 @@ setwd(file.path(wd)) #getwd()
 
 options(scipen=999)
 options(tigris_use_cache = TRUE)
+census_api_key("INSERT KEY HERE", install = TRUE)
 
 
 
+#including additional cities that were available by 3/25/26
+evals <- c("BridgeportCT2024Curr","DetroitMI2023Curr", "FargoND2024Curr", 
+           "LincolnNE2024Curr", "NewYorkNY2024Curr",  "PhiladelphPA2024Curr",
+            "WichitaKS2023Curr", 
+           
+           "AustinTX2024Curr", "BaltimoreMD2024Curr", "BurlingtonVT2023Curr",  "ChicagoIL2024Curr",
+           "ClevelandOH2024Curr",  "DesMoinesIA2024Curr", "HoustonTX2024Curr", "KansasCityMO2024Curr",
+           "MadisonWI2024Curr",  "MilwaukeeWI2024Curr",  "MinneapolMN2024Curr",  "PittsburghPA2024Curr",
+           "PortlandME2023Curr", "PortlandOR2024Curr", "ProvidenceRI2024Curr", "RochesterNY2023Curr", 
+           "SanAntonioTX2024Curr", "SanDiegoCA2024Curr", "SpringfielMO2020Curr", "StLouisMO2024Curr",    
+           "TrentonNJ2024Curr", "WashingtonDC2024Curr")
 
-#including additional cities that were available on 11/23/2024
-evals <- c("AustinTX2022Curr", "BaltimoreMD2022Curr", "BurlingtonVT2022Curr",  "ChicagoIL2022Curr",
-           "ClevelandOH2022Curr",  "DesMoinesIA2022Curr", "HoustonTX2022Curr", "KansasCityMO2022Curr",
-           "MadisonWI2022Curr",  "MilwaukeeWI2022Curr",  "MinneapolMN2022Curr",  "PittsburghPA2022Curr",
-           "PortlandME2022Curr", "PortlandOR2022Curr", "ProvidenceRI2022Curr", "RochesterNY2022Curr", 
-           "SanAntonioTX2022Curr", "SanDiegoCA2022Curr", "SpringfielMO2020Curr", "StLouisMO2022Curr",    
-           "TrentonNJ2022Curr", "WashingtonDC2022Curr" )
+statewide_censuses <- c("CTUrbanAreas2024Curr", "IAUrbanAreas2024Curr","MDUrbanAreas2024Curr", 
+                        "MEUrbanAreas2023Curr", "MNUrbanAreas2024Curr", "NDUrbanAreas2024Curr", 
+                        "NJUrbanAreas2024Curr", "RIUrbanAreas2024Curr", "VTUrbanAreas2023Curr",
+                        "WIUrbanAreas2024Curr")
+
 
 ### adding the Urban FIA data from datamart and creating derived variables #####################################
     # this version of UFIA was downloaded Nov 2024
@@ -109,7 +119,7 @@ evals <- c("AustinTX2022Curr", "BaltimoreMD2022Curr", "BurlingtonVT2022Curr",  "
 ### start the city loop for extracting US Census (ACS) data for each UFIA plot ##############
 pcv_out <- list() 
 for(i in c(1:length(evals))){   # to run all cities. 
-    #for(i in c(8:22)){   #
+    #for(i in c(1:1)){   #
   
   ### For each city prepare UFIA data ======================================================
   
