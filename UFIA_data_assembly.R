@@ -31,7 +31,7 @@ setwd(file.path(wd)) #getwd()
 
 options(scipen=999)
 options(tigris_use_cache = TRUE)
-census_api_key("INSERT KEY HERE", install = TRUE)
+#census_api_key("INSERT KEY HERE", install = TRUE)
 
 
 
@@ -54,7 +54,7 @@ statewide_censuses <- c("CTUrbanAreas2024Curr", "IAUrbanAreas2024Curr","MDUrbanA
 
 
 ### adding the Urban FIA data from datamart and creating derived variables #####################################
-    # this version of UFIA was downloaded Nov 2024
+    # this version of UFIA was downloaded May 2026
     psca <- read.csv(file.path("data","FIADB_URBAN_ENTIRE_CSV/ID_PLOT_STRAT_CALC_ASSGN.csv"))
     psc <- read.csv(file.path("data","FIADB_URBAN_ENTIRE_CSV/POP_STRATUM_CALC.csv"))
     plt <- read.csv(file.path("data","FIADB_URBAN_ENTIRE_CSV/ID_PLOT.csv")) #summary(plt)
@@ -185,7 +185,7 @@ for(i in c(1:length(evals))){   # to run all cities.
                     
                      state = unique(sf_plots$state), 
                      #summary_var = "B03002_001",
-                     year = 2020, 
+                     year = 2023, 
                      survey = "acs5", #use the 5-yr survey for greater reliability
                      output = "wide",
                      geometry = TRUE) %>% 
@@ -201,7 +201,7 @@ for(i in c(1:length(evals))){   # to run all cities.
     places <- get_acs(geography = "place", 
                       variables = c(medincome = "B19013_001"), 
                       state = unique(sf_plots$state), 
-                      year = 2020,
+                      year = 2023,
                       survey = "acs5",
                       geometry = TRUE) 
     

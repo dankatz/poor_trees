@@ -32,7 +32,7 @@ setwd(file.path(wd)) #getwd()
 
 ### load the file for the analysis 
 csv_out_path <- file.path(here::here(),"out")
-ufia_acs <- read_csv( file.path(csv_out_path, "ufia_acs_for_analysis_260326.csv")) %>% 
+ufia_acs <- read_csv( file.path(csv_out_path, "ufia_acs_for_analysis_260511.csv")) %>% 
   mutate(plot_perc_damaged = plot_prop_damaged * 100,
          plot_perc_alive = plot_prop_alive * 100,
          plot_perc_dead = 100 - plot_perc_alive,
@@ -428,6 +428,6 @@ ufia_response_vars <- c(#"plot_spp_richness", #"plot_n_trees",
                                   fig_si2_pov_e, fig_si2_white_f,
                                   ncol = 2, labels = c("A", "B", "C", "D", "E", "F"))
     
-    ggsave(fig_si2, filename = "fig_SI_2_260331.jpeg",  width = 7, height = 10, units = "in", dpi = 300) #may need some resizing
+    ggsave(fig_si2, filename = "fig_SI_2_260511.jpeg",  width = 7, height = 10, units = "in", dpi = 300) #may need some resizing
     
         
