@@ -40,6 +40,10 @@ ufia_acs <- read_csv( file.path(csv_out_path, "ufia_acs_for_analysis_260511.csv"
          plot_street_tree_perc = plot_street_tree * 100) %>% 
   filter(!is.na(city)) #remove the plots that did not connect to census data
 
+ufia_acs_indiv <- read_csv( file.path(csv_out_path, "ufia_acs_indiv_for_analysis_260720.csv")) %>% 
+  filter(!is.na(city)) #remove the plots that did not connect to census data
+
+#length(unique(ufia_acs_indiv$PLT_CN))
 
 ## summary statistics for paper ####################################################################
 #number of trees censused per city
@@ -75,22 +79,30 @@ ufia_acs %>%
 
 
 ### Fig 1: comparison of tree damage and LAI with poverty and whiteness ############################
+# formerly SI 2
 
-
-### SI 2: comparison of plot trees alive, tree species richness, planted trees, and street trees with poverty and whiteness ################
 study_wide_max_poverty <- max(ufia_acs$estimate_c_perc_poverty)
 
 ### panel A, B: city level relationships between damage and poverty and whiteness
-    ufia_acs_focal <- ufia_acs %>% 
-      mutate(focal_var = plot_perc_damaged )
+    ufia_acs_indiv_focal <- ufia_acs_indiv_focal %>% 
+      mutate(focal_var = damaged )
     focal_y_lab <- expression("damage (%)")
-    m_si2_focal <- lmer(focal_var  ~ estimate_c_perc_poverty +  estimate_c_perc_white + (1|city), data = ufia_acs_focal)
+    m_si2_focal <- lmer(focal_var  ~ estimate_c_perc_poverty +  estimate_c_perc_white + (1|city/PLT_CN), data = ufia_acs_indiv_focal)
     m_si2_focal_summary <- summary(m_si2_focal)
     check_collinearity(m_si2_focal)
     print(m_si2_focal_summary)
+    VarCorr(m_si2_focal)
     
     poverty_p <- paste("p =", round( m_si2_focal_summary$coefficients[2,5], 3))
     white_p <- paste("p =", round( m_si2_focal_summary$coefficients[3,5], 3))
+    
+           # damage_range <- seq(min(ufia_acs$estimate_c_perc_poverty), study_wide_max_poverty, by = 1)
+           # poverty_range <- seq(min(ufia_acs$estimate_c_perc_white), max(ufia_acs$estimate_c_perc_white), by = 1)
+           # global_pred <- data.frame(damage = damage_range)
+           # # add other fixed-effect predictors at representative values (mean, median, or reference level)
+           # 
+           # global_pred$fit <- predict(m_si2_focal, newdata = global_pred, re.form = NA)
+           
     
     ### poverty 
     ## individual city level
@@ -103,7 +115,7 @@ study_wide_max_poverty <- max(ufia_acs$estimate_c_perc_poverty)
     
     
     pred_focal_pov <- pred_grid_city_pov %>% 
-      mutate(fit = predict(m_si2_focal, pred_grid_city_pov))
+      mutate(fit = predict(m_si2_focal, pred_grid_city_pov, re.form = ~(1|city)))
     
     #overall effect  
     effect_var_a <- effects::effect("estimate_c_perc_poverty", m_si2_focal, xlevels = 100)       # Calculate the effects 
@@ -112,11 +124,11 @@ study_wide_max_poverty <- max(ufia_acs$estimate_c_perc_poverty)
     #create plot    
     fig_1_pov_a <- 
       ggplot() +
-      geom_line(data = pred_focal_pov, aes(x = estimate_c_perc_poverty, y = fit, group = city), alpha = 0.2) +
+      geom_line(data = pred_focal_pov, aes(x = estimate_c_perc_poverty, y = fit * 100, group = city), alpha = 0.2) +
       
-      geom_line(data = effect_var_a_df, aes(x = estimate_c_perc_poverty, y = fit), color = "blue") +
-      geom_ribbon(data = effect_var_a_df, aes(x = estimate_c_perc_poverty, y = fit, 
-                                              ymin = lower, ymax = upper), fill = "blue", alpha = 0.2) +
+      geom_line(data = effect_var_a_df, aes(x = estimate_c_perc_poverty, y = fit* 100), color = "blue") +
+      geom_ribbon(data = effect_var_a_df, aes(x = estimate_c_perc_poverty, y = fit * 100, 
+                                              ymin = lower * 100, ymax = upper * 100), fill = "blue", alpha = 0.2) +
       annotate("text", label = poverty_p, x = 15, y = 80)+
       ggthemes::theme_few() + ylab(focal_y_lab) + xlab("neighborhood poverty (%)") 
     #geom_rug(data = ufia_acs_focal, aes(x = estimate_c_perc_poverty, y = focal_var), alpha = 0.05, position = position_jitter(height = 2))
@@ -133,7 +145,7 @@ study_wide_max_poverty <- max(ufia_acs$estimate_c_perc_poverty)
     
     
     pred_focal_white <- pred_grid_city_white %>% 
-      mutate(fit = predict(m_si2_focal, pred_grid_city_white))
+      mutate(fit = predict(m_si2_focal, pred_grid_city_white, re.form = ~(1|city)))
     
     #overall effect  
     effect_var_b <- effects::effect("estimate_c_perc_white", m_si2_focal, xlevels = 100)       # Calculate the effects 
@@ -142,18 +154,18 @@ study_wide_max_poverty <- max(ufia_acs$estimate_c_perc_poverty)
     #create plot    
     fig_1_white_b <- 
       ggplot() +
-      geom_line(data = pred_focal_white, aes(x = estimate_c_perc_white, y = fit, group = city), alpha = 0.2) +
+      geom_line(data = pred_focal_white, aes(x = estimate_c_perc_white, y = fit * 100, group = city), alpha = 0.2) +
       
-      geom_line(data = effect_var_b_df, aes(x = estimate_c_perc_white, y = fit), color = "blue") +
-      geom_ribbon(data = effect_var_b_df, aes(x = estimate_c_perc_white, y = fit, 
-                                              ymin = lower, ymax = upper), fill = "blue", alpha = 0.2) +
+      geom_line(data = effect_var_b_df, aes(x = estimate_c_perc_white, y = fit* 100), color = "blue") +
+      geom_ribbon(data = effect_var_b_df, aes(x = estimate_c_perc_white, y = fit* 100, 
+                                              ymin = lower* 100, ymax = upper* 100), fill = "blue", alpha = 0.2) +
       annotate("text", label = white_p, x = 85, y = 63)+
       
       ggthemes::theme_few() + ylab(focal_y_lab) + xlab("neighborhood whiteness (%)") 
     #geom_rug(data = ufia_acs_focal, aes(x = estimate_c_perc_white, y = focal_var), alpha = 0.05, position = position_jitter(height = 2))
 
 
-### panel C, D: city level relationships between LAI and poverty and whiteness
+### panel B, D: city level relationships between LAI and poverty and whiteness
     ufia_acs_focal <- ufia_acs %>% 
       mutate(focal_var = plot_mean_LAI )
     focal_y_lab <- expression("mean LAI (m"^2*"/m"^2*")")
@@ -224,10 +236,19 @@ study_wide_max_poverty <- max(ufia_acs$estimate_c_perc_poverty)
 
 
     
-    
+    # 
+    # ufia_acs_focal <- ufia_acs %>% 
+    #   mutate(focal_var = plot_perc_damaged )
+    # focal_y_lab <- expression("damage (%)")
+    # m_si2_focal <- lmer(focal_var  ~ estimate_c_perc_poverty +  estimate_c_perc_white + (1|city/PLT_CN), data = ufia_acs_indiv_focal)
+    # m_si2_focal_summary <- summary(m_si2_focal)
+    # check_collinearity(m_si2_focal)
+    # print(m_si2_focal_summary)
+    # VarCorr(m_si2_focal)
+    # 
     
   ## Panel E: the combined effect of both poverty and whiteness on tree damage
-    m1 <- lmer(plot_perc_damaged ~ estimate_c_perc_poverty +  estimate_c_perc_white + (1|city), data = ufia_acs)
+    m1 <- lmer(damaged ~ estimate_c_perc_poverty +  estimate_c_perc_white + (1|city/PLT_CN), data = ufia_acs_indiv_focal)
     m1_summary <- summary(m1)
     print(m1_summary)
     check_collinearity(m1)
@@ -236,11 +257,10 @@ study_wide_max_poverty <- max(ufia_acs$estimate_c_perc_poverty)
     pov_df <- data.frame(estimate_c_perc_poverty = 0:round(max(ufia_acs$estimate_c_perc_poverty), 0))
     whi_df <- data.frame(estimate_c_perc_white = 0:100)
     
-    pred_df2 <- expand_grid(pov_df, whi_df) %>% 
-      mutate(city = "Washington, DC")
+    pred_df2 <- expand_grid(pov_df, whi_df)
     
     pred_df3 <-  pred_df2 %>% 
-      mutate(pred = predict(m1, newdata = pred_df2) - 0.5555428 ) #account for the effect of Washington DC 
+      mutate(pred = predict(m1, newdata = pred_df2, re.form = NA) ) # no random effects — population-level
     
     fig1_e <- ggplot(pred_df3, aes(x= estimate_c_perc_poverty, y = estimate_c_perc_white, fill = pred)) +
           geom_tile() + scale_fill_viridis_c(name = "damage (%)", option = "inferno") + xlab("poverty (%)") + ylab("White (%)") +
@@ -267,12 +287,11 @@ study_wide_max_poverty <- max(ufia_acs$estimate_c_perc_poverty)
                                                         study_wide_poverty99, study_wide_poverty1),
                             estimate_c_perc_white = c(study_wide_mean_white, study_wide_mean_white,
                                                       study_wide_white1, study_wide_white99,
-                                                      study_wide_white1, study_wide_white99)) %>% 
-        mutate(city = "Washington, DC")
+                                                      study_wide_white1, study_wide_white99)) 
      
       ranef(m1) # What is the random effect for the city-level intercept
       
-      preds <- predict(m1, newdata = pred_df) - 0.5555428 #account for the effect of the city 
+      preds <- predict(m1, newdata = pred_df, re.form = NA) # no random effects — population-level
       pred_df %>% mutate(preds = preds)
       
       
@@ -427,10 +446,10 @@ ufia_response_vars <- c(#"plot_spp_richness", #"plot_n_trees",
 ### SI 2: tree mortality ###########################################################################
   
   ### SI 2: panel E, F: city level relationships between dead trees and poverty and whiteness
-  ufia_acs_focal <- ufia_acs %>% 
-    mutate(focal_var = plot_perc_dead  )
+  ufia_acs_indiv_focal <- ufia_acs_indiv_focal %>% 
+    mutate(focal_var = tree_alive )
   focal_y_lab <- expression("dead (%)")
-  m_si2_focal <- lmer(focal_var  ~ estimate_c_perc_poverty +  estimate_c_perc_white + (1|city), data = ufia_acs_focal)
+  m_si2_focal <- lmer(focal_var  ~ estimate_c_perc_poverty +  estimate_c_perc_white + (1|city/PLT_CN), data = ufia_acs_indiv_focal)
   m_si2_focal_summary <- summary(m_si2_focal)
   check_collinearity(m_si2_focal)
   print(m_si2_focal_summary)
@@ -448,7 +467,7 @@ ufia_response_vars <- c(#"plot_spp_richness", #"plot_n_trees",
     mutate(estimate_c_perc_white = mean(ufia_acs$estimate_c_perc_white))
   
   pred_focal_pov <- pred_grid_city_pov %>% 
-    mutate(fit = predict(m_si2_focal, pred_grid_city_pov))
+    mutate(fit = predict(m_si2_focal, pred_grid_city_pov, re.form = ~(1|city)))
   
   #overall effect  
   effect_var_a <- effects::effect("estimate_c_perc_poverty", m_si2_focal, xlevels = 100)       # Calculate the effects 
@@ -457,12 +476,12 @@ ufia_response_vars <- c(#"plot_spp_richness", #"plot_n_trees",
   #create plot    
   fig_si2_pov_e <- 
     ggplot() +
-    geom_line(data = pred_focal_pov, aes(x = estimate_c_perc_poverty, y = fit, group = city), alpha = 0.2) +
+    geom_line(data = pred_focal_pov, aes(x = estimate_c_perc_poverty, y = fit * 100, group = city), alpha = 0.2) +
     
-    geom_line(data = effect_var_a_df, aes(x = estimate_c_perc_poverty, y = fit), color = "blue") +
-    geom_ribbon(data = effect_var_a_df, aes(x = estimate_c_perc_poverty, y = fit, 
-                                            ymin = lower, ymax = upper), fill = "blue", alpha = 0.2) +
-    annotate("text", label = poverty_p, x = 15, y = 18) +
+    geom_line(data = effect_var_a_df, aes(x = estimate_c_perc_poverty, y = fit* 100), color = "blue") +
+    geom_ribbon(data = effect_var_a_df, aes(x = estimate_c_perc_poverty, y = fit* 100, 
+                                            ymin = lower * 100, ymax = upper* 100), fill = "blue", alpha = 0.2) +
+    annotate("text", label = poverty_p, x = 15, y = 96) +
     ggthemes::theme_few() + ylab(focal_y_lab) + xlab("neighborhood poverty (%)") 
   #geom_rug(data = ufia_acs_focal, aes(x = estimate_c_perc_poverty, y = focal_var), alpha = 0.05, position = position_jitter(height = 2))
   
@@ -477,7 +496,7 @@ ufia_response_vars <- c(#"plot_spp_richness", #"plot_n_trees",
     mutate(estimate_c_perc_poverty = mean(ufia_acs$estimate_c_perc_poverty))
   
   pred_focal_white <- pred_grid_city_white %>% 
-    mutate(fit = predict(m_si2_focal, pred_grid_city_white))
+    mutate(fit = predict(m_si2_focal, pred_grid_city_white, re.form = ~(1|city)))
   
   #overall effect  
   effect_var_b <- effects::effect("estimate_c_perc_white", m_si2_focal, xlevels = 100)       # Calculate the effects 
@@ -486,21 +505,19 @@ ufia_response_vars <- c(#"plot_spp_richness", #"plot_n_trees",
   #create plot    
   fig_si2_white_f <- 
     ggplot() +
-    geom_line(data = pred_focal_white, aes(x = estimate_c_perc_white, y = fit, group = city), alpha = 0.2) +
+    geom_line(data = pred_focal_white, aes(x = estimate_c_perc_white, y = fit * 100, group = city), alpha = 0.2) +
     
-    geom_line(data = effect_var_b_df, aes(x = estimate_c_perc_white, y = fit), color = "blue") +
-    geom_ribbon(data = effect_var_b_df, aes(x = estimate_c_perc_white, y = fit, 
-                                            ymin = lower, ymax = upper), fill = "blue", alpha = 0.2) +
-    annotate("text", label = white_p, x = 85, y = 19)+
+    geom_line(data = effect_var_b_df, aes(x = estimate_c_perc_white, y = fit* 100), color = "blue") +
+    geom_ribbon(data = effect_var_b_df, aes(x = estimate_c_perc_white, y = fit* 100, 
+                                            ymin = lower * 100, ymax = upper * 100), fill = "blue", alpha = 0.2) +
+    annotate("text", label = white_p, x = 85, y = 79)+
     ggthemes::theme_few() + ylab(focal_y_lab) + xlab("neighborhood whiteness (%)") 
   #geom_rug(data = ufia_acs_focal, aes(x = estimate_c_perc_white, y = focal_var), alpha = 0.05, position = position_jitter(height = 2))
   
   ### save fig si2 
-  fig_si2 <- cowplot::plot_grid(fig_si2_pov_a, fig_si2_white_b,
-                                fig_si2_pov_c, fig_si2_white_d,
-                                fig_si2_pov_e, fig_si2_white_f,
-                                ncol = 2, labels = c("A", "B", "C", "D", "E", "F"))
+  fig_si2 <- cowplot::plot_grid( fig_si2_pov_e, fig_si2_white_f,
+                                ncol = 2, labels = c("A", "B"))
   
-  ggsave(fig_si2, filename = "fig_SI_2_260512.jpeg",  width = 7, height = 10, units = "in", dpi = 300) #may need some resizing
+  ggsave(fig_si2, filename = "fig_SI_2_260720.jpeg",  width = 7, height = 10, units = "in", dpi = 300) #may need some resizing
   
   

@@ -290,6 +290,58 @@ for(i in c(1:length(evals))){   # to run all cities.
 
     write_csv(x = ufia_acs, file = file.path(csv_out_path, paste0("ufia_acs_for_analysis_", formatted_date, ".csv")))
 
+    
+### create a version that is per tree instead of per plot ##########################################################
+    #summarize damage at the individual stem level 
+      indiv_tree_damage <- indiv_tree %>% 
+      mutate(damaged = case_when(DMG_ROOT_STEM_GIRDLING == 1 ~ 1,
+                                 DMG_TRUNK_BARK_INCLUSION == 1 ~ 1,
+                                 DMG_EXCESS_MULCH == 1 ~ 1,
+                                 DMG_TOPPING_PRUNING == 1 ~ 1,
+                                 DMG_SIDEWALK_ROOT_CONFLICT == 1 ~ 1,
+                                 DMG_OVERHEAD_WIRES == 1 ~ 1,
+                                 DMG_IMPROPER_PLANTING== 1 ~ 1, 
+                                 .default = 0)) %>% 
+      group_by(PLOTID, TREE) %>% 
+      dplyr:: summarise(damaged = max(damaged, na.rm = TRUE))
+    
+    ## extract more individual tree information
+    tree_indiv <- 
+      left_join(mtre, indiv_tree_damage) %>% #adding in the tree damage from the indiv_tree (ID_TREE) dataset
+      #group_by(PLT_CN) %>% 
+      filter(SUBP == 1) %>%  #restricting to non-sapling trees (DBH > 5 in)
+      filter(STATUSCD == 1 | STATUSCD == 2) %>% #removing trees that weren't measured due to no longer being in the sample
+      #STATUSCD 0 == tree is not in the remeasured plot, STATUSCD 3 == cut and utilized, STATUSCD 4 == removed
+      mutate(tree_alive = case_when(STATUSCD == 2 ~ 0, #STATUSCD 1 == live tree, STATUSCD 2 == dead tree
+                                     STATUSCD == 1 ~ 1),
+             tree_planted = case_when(IS_PLANTED == 1 ~ 1, #1 == planted
+                                       IS_PLANTED == 2 ~ 0, #2 == natural origin
+                                       IS_PLANTED == 3 ~ 0)) %>% #3 == "not sure"; we are lumping unsure with natural origin
+      select(PLT_CN, PLOTID, TREE,
+             tree_BA = BASAL_AREA,
+             tree_LA = LEAF_AREA_ITREE,
+             tree_canopy_area = CROWN_GROUND_AREA_ITREE,
+             tree_street_tree = IS_STREET_TREE,
+             tree_planted,
+             tree_alive,
+             tree_crown_diam = CROWN_DIA_90,
+             damaged)
+    
+    ## join 
+    plot_tree_indiv <- left_join(tree_indiv, ufia_acs)  #, by = c("PLOTID" = "PLT_CN"))
+     # filter(!is.na(city)) #remove the plots that did not connect to census data
+      
+    ### save the file used in the new version of the analysis 
+    csv_out_path <- file.path(here::here(),"out")
+    formatted_date <- format(Sys.Date(), "%y%m%d") # Gives "02-01-2025"
+    
+    write_csv(x = plot_tree_indiv, file = file.path(csv_out_path, paste0("ufia_acs_indiv_for_analysis_", formatted_date, ".csv")))
+    
+    
+      
+      
+      
+    
 ### additional QA/QC ##############################################################################################
     
 # are plots without information those that we wouldn't expect to have any info?
