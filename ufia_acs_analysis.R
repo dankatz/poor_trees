@@ -125,13 +125,15 @@ ufia_acs %>%
     get_term_stats <- function(model, term_name) {
       tidy(model, effects = "fixed", conf.int = TRUE) %>%
         filter(term == term_name) %>%
-        mutate(p_label = paste0("p = ", format.pval(p.value, digits = 2, eps = 0.001)))
+        mutate(p_label = paste0("p = ", format.pval(p.value, digits = 2, eps = 0.001))) |> 
+        mutate(p_label = case_when(p_label == "p = <0.001" ~ "p ≤ 0.001",
+                                   .default = p_label))
     }
      
 study_wide_max_poverty <- max(ufia_acs$estimate_c_perc_poverty)
 
 ### panel A, B: city level relationships between damage and poverty and whiteness
-    ufia_acs_indiv_focal <- ufia_acs_indiv_focal %>% 
+    ufia_acs_indiv_focal <- ufia_acs_indiv %>% 
       mutate(focal_var = damaged )
     focal_y_lab <- expression("damage (%)")
     m1_a <- glmer(focal_var  ~ estimate_c_perc_poverty +  estimate_c_perc_white + (1|city/PLT_CN), 
@@ -409,7 +411,7 @@ study_wide_max_poverty <- max(ufia_acs$estimate_c_perc_poverty)
                                 rel_heights = c(1, 1, 1.3))
     fig_1
     
-    ggsave(fig_1, filename = "fig_1_260723.jpeg",  width = 7, height = 10, units = "in", dpi = 300) #may need some resizing
+    ggsave(fig_1, filename = "fig_1_260810.jpeg",  width = 7, height = 10, units = "in", dpi = 300) #may need some resizing
     
     
     # 
